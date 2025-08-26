@@ -1,171 +1,148 @@
 <!DOCTYPE html>
-<html lang="bs">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Remi Poeni</title>
+<title>Remi Score Tracker</title>
 <style>
     body {
         font-family: Arial, sans-serif;
-        background: #f0f4f8;
-        margin: 0;
-        padding: 0;
+        background: #f0f0f0;
         display: flex;
         flex-direction: column;
         align-items: center;
-    }
-    h1 {
-        color: #2c3e50;
-        margin-top: 20px;
-    }
-    .container {
-        background: #fff;
         padding: 20px;
-        margin: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        width: 90%;
-        max-width: 400px;
     }
-    input, button {
-        padding: 10px;
-        margin: 5px 0;
-        font-size: 16px;
-        border-radius: 8px;
-        border: 1px solid #ccc;
-        width: 100%;
-    }
-    button {
-        background: #3498db;
-        color: white;
-        border: none;
-        cursor: pointer;
-    }
-    button:hover {
-        background: #2980b9;
-    }
-    ul {
-        list-style: none;
-        padding: 0;
-    }
-    li {
-        padding: 6px 0;
-        border-bottom: 1px solid #eee;
-    }
-    .history {
-        margin-top: 20px;
-        background: #ecf0f1;
-        padding: 10px;
-        border-radius: 8px;
-        max-height: 200px;
-        overflow-y: auto;
-    }
+    h1 { color: #333; }
+    input, button { padding: 10px; margin: 5px; border-radius: 5px; border: 1px solid #ccc; }
+    button { background-color: #007bff; color: white; border: none; cursor: pointer; }
+    button:hover { background-color: #0056b3; }
+    .player { margin: 5px 0; }
+    .results, .history { margin-top: 20px; width: 100%; max-width: 400px; }
+    .results div, .history div { display: flex; justify-content: space-between; padding: 5px; background: white; margin-bottom: 5px; border-radius: 5px; }
+    .history-title { margin-top: 30px; font-weight: bold; }
 </style>
 </head>
 <body>
 
-<h1>Remi Poeni</h1>
+<h1>Remi Score Tracker</h1>
 
-<div class="container" id="setupDiv">
-    <label>Broj igrača (2-6):</label>
-    <input type="number" id="numPlayers" min="2" max="6">
+<div id="setup">
+    <input type="number" id="numPlayers" placeholder="Broj igrača (2-6)" min="2" max="6">
     <button onclick="setupPlayers()">Dalje</button>
 </div>
 
-<div class="container" id="playersDiv" style="display:none;">
-    <div id="playerInputs"></div>
-    <button onclick="startGame()">Počni igru</button>
-</div>
+<div id="game" style="display:none;">
+    <div id="playersList"></div>
+    <button onclick="addRound()">Dodaj bodove za rundu</button>
+    <button onclick="finishGame()">Završi igru</button>
 
-<div class="container" id="gameDiv" style="display:none;">
-    <h2>Trenutni djelitelj: <span id="dealerName"></span></h2>
-    <div id="scoreInputs"></div>
-    <button onclick="updateScores()">Ažuriraj rezultate</button>
-    <h3>Rezultati:</h3>
-    <ul id="scoreList"></ul>
-
-    <h3>Istorija bodova:</h3>
-    <div class="history" id="historyDiv"></div>
+    <div class="results" id="results"></div>
+    
+    <div class="history-title">Istorija rundi:</div>
+    <div class="history" id="history"></div>
 </div>
 
 <script>
-let state = {
-    players: [],
-    scores: [],
-    dealerIndex: 0,
-    history: []
-};
+const state = { players: [], scores: [], dealerIndex: 0, rounds: [] };
+
+// Učitavanje iz localStorage ako postoji
+if (localStorage.getItem('remiState')) {
+    const saved = JSON.parse(localStorage.getItem('remiState'));
+    Object.assign(state, saved);
+    if(state.players.length > 0) {
+        document.getElementById('setup').style.display = 'none';
+        document.getElementById('game').style.display = 'block';
+        renderPlayers();
+        renderResults();
+        renderHistory();
+    }
+}
 
 function setupPlayers() {
     const num = parseInt(document.getElementById("numPlayers").value);
-    if (isNaN(num) || num < 2 || num > 6) return alert("Unesi broj 2-6!");
-    state.players = Array(num).fill("").map((_, i) => "");
-    state.scores = Array(num).fill(0);
-
-    const playerInputs = document.getElementById("playerInputs");
-    playerInputs.innerHTML = "";
+    if (isNaN(num) || num < 2 || num > 6) return alert("Unesi broj između 2 i 6.");
+    state.players = [];
+    state.scores = [];
+    state.rounds = [];
+    state.dealerIndex = 0;
     for (let i = 0; i < num; i++) {
-        playerInputs.innerHTML += `<input placeholder="Ime igrača ${i+1}" id="player${i}">`;
+        const name = prompt(`Unesi ime igrača ${i+1}:`);
+        state.players.push(name || `Igrač ${i+1}`);
+        state.scores.push(0);
     }
-
-    document.getElementById("setupDiv").style.display = "none";
-    document.getElementById("playersDiv").style.display = "block";
+    saveState();
+    document.getElementById('setup').style.display = 'none';
+    document.getElementById('game').style.display = 'block';
+    renderPlayers();
+    renderResults();
+    renderHistory();
 }
 
-function startGame() {
-    for (let i = 0; i < state.players.length; i++) {
-        const name = document.getElementById(`player${i}`).value.trim();
-        if (!name) return alert("Unesi sva imena!");
-        state.players[i] = name;
-    }
-    document.getElementById("playersDiv").style.display = "none";
-    document.getElementById("gameDiv").style.display = "block";
-    renderGame();
-}
-
-function renderGame() {
-    document.getElementById("dealerName").textContent = state.players[state.dealerIndex];
-
-    const scoreInputs = document.getElementById("scoreInputs");
-    scoreInputs.innerHTML = "";
+function renderPlayers() {
+    const listDiv = document.getElementById('playersList');
+    listDiv.innerHTML = '';
     state.players.forEach((p, i) => {
-        scoreInputs.innerHTML += `<input type="number" placeholder="Poeni za ${p}" id="score${i}">`;
+        const div = document.createElement('div');
+        div.className = 'player';
+        div.innerHTML = `<strong>${p}</strong> (Dealer: ${i === state.dealerIndex ? '✔' : ''}) <input type="number" placeholder="Bodovi" id="score${i}">`;
+        listDiv.appendChild(div);
     });
-
-    updateScoreList();
 }
 
-function updateScores() {
+function addRound() {
     const roundScores = [];
-    for (let i = 0; i < state.players.length; i++) {
+    state.players.forEach((p, i) => {
         const val = parseInt(document.getElementById(`score${i}`).value);
-        if (isNaN(val)) return alert("Unesi sve poene!");
-        state.scores[i] += val;
-        roundScores.push(`${state.players[i]}: ${val}`);
-    }
-
-    state.history.push(roundScores.join(", "));
+        const points = !isNaN(val) ? val : 0;
+        state.scores[i] += points;
+        roundScores.push(points);
+        document.getElementById(`score${i}`).value = '';
+    });
+    state.rounds.push(roundScores);
     state.dealerIndex = (state.dealerIndex + 1) % state.players.length;
-    renderGame();
-    updateHistory();
+    saveState();
+    renderPlayers();
+    renderResults();
+    renderHistory();
 }
 
-function updateScoreList() {
-    const ul = document.getElementById("scoreList");
-    const combined = state.players.map((p,i)=>({name:p,score:state.scores[i]}));
-    combined.sort((a,b)=>a.score-b.score); // najbolji najmanji score
-    ul.innerHTML = "";
-    combined.forEach(c=>{
-        ul.innerHTML += `<li>${c.name}: ${c.score}</li>`;
+function renderResults() {
+    const resDiv = document.getElementById('results');
+    resDiv.innerHTML = '';
+    const sorted = state.players.map((p,i)=>({name:p,score:state.scores[i]}))
+        .sort((a,b)=>a.score-b.score);
+    sorted.forEach(s => {
+        const div = document.createElement('div');
+        div.innerHTML = `<span>${s.name}</span><span>${s.score}</span>`;
+        resDiv.appendChild(div);
     });
 }
 
-function updateHistory() {
-    const div = document.getElementById("historyDiv");
-    div.innerHTML = "";
-    state.history.forEach((r, i) => {
-        div.innerHTML += `<div><strong>Runda ${i+1}:</strong> ${r}</div>`;
+function renderHistory() {
+    const histDiv = document.getElementById('history');
+    histDiv.innerHTML = '';
+    state.rounds.forEach((round, idx) => {
+        const div = document.createElement('div');
+        div.innerHTML = `<span>Runda ${idx+1}</span><span>${round.map((s,i)=>state.players[i]+':'+s).join(', ')}</span>`;
+        histDiv.appendChild(div);
     });
+}
+
+function finishGame() {
+    if(confirm("Da li želiš završiti igru? Svi rezultati će biti izbrisani.")) {
+        localStorage.removeItem('remiState');
+        state.players = [];
+        state.scores = [];
+        state.dealerIndex = 0;
+        state.rounds = [];
+        document.getElementById('setup').style.display = 'block';
+        document.getElementById('game').style.display = 'none';
+    }
+}
+
+function saveState() {
+    localStorage.setItem('remiState', JSON.stringify(state));
 }
 </script>
 
