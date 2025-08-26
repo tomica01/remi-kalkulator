@@ -3,146 +3,105 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Remi Score Tracker</title>
+<title>Remi Scorer</title>
 <style>
-    body {
-        font-family: Arial, sans-serif;
-        background: #f0f0f0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 20px;
-    }
-    h1 { color: #333; }
-    input, button { padding: 10px; margin: 5px; border-radius: 5px; border: 1px solid #ccc; }
-    button { background-color: #007bff; color: white; border: none; cursor: pointer; }
-    button:hover { background-color: #0056b3; }
-    .player { margin: 5px 0; }
-    .results, .history { margin-top: 20px; width: 100%; max-width: 400px; }
-    .results div, .history div { display: flex; justify-content: space-between; padding: 5px; background: white; margin-bottom: 5px; border-radius: 5px; }
-    .history-title { margin-top: 30px; font-weight: bold; }
+  body { font-family: Arial, sans-serif; background: #f0f0f0; color: #333; padding: 20px; }
+  h1 { text-align: center; }
+  #playerSetup, #scoreboard { margin: 20px auto; max-width: 400px; }
+  input { padding: 5px; margin: 5px 0; width: 100%; }
+  button { padding: 10px; margin: 10px 0; width: 100%; background: #007bff; color: white; border: none; cursor: pointer; }
+  button:hover { background: #0056b3; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
 </style>
 </head>
 <body>
 
-<h1>Remi Score Tracker</h1>
+<h1>Remi Scorer</h1>
 
-<div id="setup">
-    <input type="number" id="numPlayers" placeholder="Broj igrača (2-6)" min="2" max="6">
-    <button onclick="setupPlayers()">Dalje</button>
+<div id="playerSetup">
+  <p>Unesite broj igrača (2-6):</p>
+  <input type="number" id="numPlayers" min="2" max="6">
+  <button onclick="setupPlayers()">Dalje</button>
 </div>
 
-<div id="game" style="display:none;">
-    <div id="playersList"></div>
-    <button onclick="addRound()">Dodaj bodove za rundu</button>
-    <button onclick="finishGame()">Završi igru</button>
-
-    <div class="results" id="results"></div>
-    
-    <div class="history-title">Istorija rundi:</div>
-    <div class="history" id="history"></div>
+<div id="scoreboard" style="display:none;">
+  <h2>Rezultati</h2>
+  <div id="scoresInputs"></div>
+  <button onclick="submitScores()">Dodaj bodove</button>
+  <table>
+    <thead>
+      <tr>
+        <th>Igrač</th>
+        <th>Bodovi</th>
+      </tr>
+    </thead>
+    <tbody id="scoresTable"></tbody>
+  </table>
+  <button onclick="resetGame()">Završi igru</button>
 </div>
 
 <script>
-const state = { players: [], scores: [], dealerIndex: 0, rounds: [] };
-
-// Učitavanje iz localStorage ako postoji
-if (localStorage.getItem('remiState')) {
-    const saved = JSON.parse(localStorage.getItem('remiState'));
-    Object.assign(state, saved);
-    if(state.players.length > 0) {
-        document.getElementById('setup').style.display = 'none';
-        document.getElementById('game').style.display = 'block';
-        renderPlayers();
-        renderResults();
-        renderHistory();
-    }
-}
+const state = { players: [], scores: [], dealerIndex: 0, history: [] };
 
 function setupPlayers() {
-    const num = parseInt(document.getElementById("numPlayers").value);
-    if (isNaN(num) || num < 2 || num > 6) return alert("Unesi broj između 2 i 6.");
+  const num = parseInt(document.getElementById("numPlayers").value);
+  if (isNaN(num) || num < 2 || num > 6) return alert("Unesi broj 2-6");
+
+  state.players = [];
+  state.scores = [];
+  state.history = [];
+  for (let i = 0; i < num; i++) {
+    const name = prompt(`Ime igrača ${i+1}:`) || `Igrač ${i+1}`;
+    state.players.push(name);
+    state.scores.push(0);
+  }
+
+  state.dealerIndex = 0;
+  renderScoreInputs();
+  document.getElementById("playerSetup").style.display = "none";
+  document.getElementById("scoreboard").style.display = "block";
+  updateScoresTable();
+}
+
+function renderScoreInputs() {
+  const container = document.getElementById("scoresInputs");
+  container.innerHTML = "";
+  state.players.forEach((player, i) => {
+    container.innerHTML += `<p>${player}: <input type="number" id="score${i}" value="0"></p>`;
+  });
+}
+
+function submitScores() {
+  const newScores = state.players.map((_, i) => parseInt(document.getElementById(`score${i}`).value) || 0);
+  state.history.push([...state.scores]);
+  state.scores = state.scores.map((s, i) => s + newScores[i]);
+  state.dealerIndex = (state.dealerIndex + 1) % state.players.length;
+  updateScoresTable();
+  renderScoreInputs();
+}
+
+function updateScoresTable() {
+  const tbody = document.getElementById("scoresTable");
+  const sorted = state.players
+    .map((p, i) => ({ name: p, score: state.scores[i] }))
+    .sort((a, b) => a.score - b.score); // najmanji rezultat najbolji
+
+  tbody.innerHTML = "";
+  sorted.forEach(p => {
+    tbody.innerHTML += `<tr><td>${p.name}</td><td>${p.score}</td></tr>`;
+  });
+}
+
+function resetGame() {
+  if (confirm("Da li želite obrisati sve rezultate?")) {
     state.players = [];
     state.scores = [];
-    state.rounds = [];
-    state.dealerIndex = 0;
-    for (let i = 0; i < num; i++) {
-        const name = prompt(`Unesi ime igrača ${i+1}:`);
-        state.players.push(name || `Igrač ${i+1}`);
-        state.scores.push(0);
-    }
-    saveState();
-    document.getElementById('setup').style.display = 'none';
-    document.getElementById('game').style.display = 'block';
-    renderPlayers();
-    renderResults();
-    renderHistory();
-}
-
-function renderPlayers() {
-    const listDiv = document.getElementById('playersList');
-    listDiv.innerHTML = '';
-    state.players.forEach((p, i) => {
-        const div = document.createElement('div');
-        div.className = 'player';
-        div.innerHTML = `<strong>${p}</strong> (Dealer: ${i === state.dealerIndex ? '✔' : ''}) <input type="number" placeholder="Bodovi" id="score${i}">`;
-        listDiv.appendChild(div);
-    });
-}
-
-function addRound() {
-    const roundScores = [];
-    state.players.forEach((p, i) => {
-        const val = parseInt(document.getElementById(`score${i}`).value);
-        const points = !isNaN(val) ? val : 0;
-        state.scores[i] += points;
-        roundScores.push(points);
-        document.getElementById(`score${i}`).value = '';
-    });
-    state.rounds.push(roundScores);
-    state.dealerIndex = (state.dealerIndex + 1) % state.players.length;
-    saveState();
-    renderPlayers();
-    renderResults();
-    renderHistory();
-}
-
-function renderResults() {
-    const resDiv = document.getElementById('results');
-    resDiv.innerHTML = '';
-    const sorted = state.players.map((p,i)=>({name:p,score:state.scores[i]}))
-        .sort((a,b)=>a.score-b.score);
-    sorted.forEach(s => {
-        const div = document.createElement('div');
-        div.innerHTML = `<span>${s.name}</span><span>${s.score}</span>`;
-        resDiv.appendChild(div);
-    });
-}
-
-function renderHistory() {
-    const histDiv = document.getElementById('history');
-    histDiv.innerHTML = '';
-    state.rounds.forEach((round, idx) => {
-        const div = document.createElement('div');
-        div.innerHTML = `<span>Runda ${idx+1}</span><span>${round.map((s,i)=>state.players[i]+':'+s).join(', ')}</span>`;
-        histDiv.appendChild(div);
-    });
-}
-
-function finishGame() {
-    if(confirm("Da li želiš završiti igru? Svi rezultati će biti izbrisani.")) {
-        localStorage.removeItem('remiState');
-        state.players = [];
-        state.scores = [];
-        state.dealerIndex = 0;
-        state.rounds = [];
-        document.getElementById('setup').style.display = 'block';
-        document.getElementById('game').style.display = 'none';
-    }
-}
-
-function saveState() {
-    localStorage.setItem('remiState', JSON.stringify(state));
+    state.history = [];
+    document.getElementById("playerSetup").style.display = "block";
+    document.getElementById("scoreboard").style.display = "none";
+    document.getElementById("numPlayers").value = "";
+  }
 }
 </script>
 
