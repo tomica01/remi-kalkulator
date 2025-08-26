@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Remi Scorer</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #f0f0f0; color: #333; padding: 20px; }
+  h1 { text-align: center; }
+  #playerSetup, #scoreboard { margin: 20px auto; max-width: 400px; }
+  input { padding: 5px; margin: 5px 0; width: 100%; }
+  button { padding: 10px; margin: 10px 0; width: 100%; background: #007bff; color: white; border: none; cursor: pointer; }
+  button:hover { background: #0056b3; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>Remi Scorer</h1>
+
+<div id="playerSetup">
+  <p>Unesite broj igrača (2-6):</p>
+  <input type="number" id="numPlayers" min="2" max="6">
+  <button onclick="setupPlayers()">Dalje</button>
+</div>
+
+<div id="scoreboard" style="display:none;">
+  <h2>Rezultati</h2>
+  <div id="scoresInputs"></div>
+  <button onclick="submitScores()">Dodaj bodove</button>
+  <table>
+    <thead>
+      <tr>
+        <th>Igrač</th>
+        <th>Bodovi</th>
+      </tr>
+    </thead>
+    <tbody id="scoresTable"></tbody>
+  </table>
+  <button onclick="resetGame()">Završi igru</button>
+</div>
+
+<script>
+const state = { players: [], scores: [], dealerIndex: 0, history: [] };
+
+function setupPlayers() {
+  const num = parseInt(document.getElementById("numPlayers").value);
+  if (isNaN(num) || num < 2 || num > 6) return alert("Unesi broj 2-6");
+
+  state.players = [];
+  state.scores = [];
+  state.history = [];
+  for (let i = 0; i < num; i++) {
+    const name = prompt(`Ime igrača ${i+1}:`) || `Igrač ${i+1}`;
+    state.players.push(name);
+    state.scores.push(0);
+  }
+
+  state.dealerIndex = 0;
+  renderScoreInputs();
+  document.getElementById("playerSetup").style.display = "none";
+  document.getElementById("scoreboard").style.display = "block";
+  updateScoresTable();
+}
+
+function renderScoreInputs() {
+  const container = document.getElementById("scoresInputs");
+  container.innerHTML = "";
+  state.players.forEach((player, i) => {
+    container.innerHTML += `<p>${player}: <input type="number" id="score${i}" value="0"></p>`;
+  });
+}
+
+function submitScores() {
+  const newScores = state.players.map((_, i) => parseInt(document.getElementById(`score${i}`).value) || 0);
+  state.history.push([...state.scores]);
+  state.scores = state.scores.map((s, i) => s + newScores[i]);
+  state.dealerIndex = (state.dealerIndex + 1) % state.players.length;
+  updateScoresTable();
+  renderScoreInputs();
+}
+
+function updateScoresTable() {
+  const tbody = document.getElementById("scoresTable");
+  const sorted = state.players
+    .map((p, i) => ({ name: p, score: state.scores[i] }))
+    .sort((a, b) => a.score - b.score); // najmanji rezultat najbolji
+
+  tbody.innerHTML = "";
+  sorted.forEach(p => {
+    tbody.innerHTML += `<tr><td>${p.name}</td><td>${p.score}</td></tr>`;
+  });
+}
+
+function resetGame() {
+  if (confirm("Da li želite obrisati sve rezultate?")) {
+    state.players = [];
+    state.scores = [];
+    state.history = [];
+    document.getElementById("playerSetup").style.display = "block";
+    document.getElementById("scoreboard").style.display = "none";
+    document.getElementById("numPlayers").value = "";
+  }
+}
+</script>
+
+</body>
+</html>
